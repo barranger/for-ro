@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://barranger.github.io/chemistry-learning-app",
+  "homepage": "https://barranger.github.io/for-ro",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
