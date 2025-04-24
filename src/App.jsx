@@ -1,43 +1,51 @@
-import { useState } from 'react'
-import ChemistryQuiz from './components/ChemistryQuiz'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useState } from 'react';
+import LandingPage from './pages/LandingPage';
+import ModuleOverview from './pages/ModuleOverview';
+import TopicPage from './pages/TopicPage';
+import ChemistryQuiz from './components/ChemistryQuiz';
+import ModuleSelector from './components/ModuleSelector';
+import './App.css';
+import modules from './config/modules';
+
+// Define our available modules
+const MODULES = {
+  chemistry: {
+    name: 'Chemistry',
+    description: 'Learn about atoms, molecules, and chemical reactions',
+    topics: [
+      {
+        id: 'nomenclature',
+        name: 'Chemical Nomenclature',
+        description: 'Learn how to name chemical compounds and write chemical formulas',
+        component: ChemistryQuiz
+      },
+      // More topics will be added here
+    ]
+  },
+  // More modules will be added here
+};
 
 function App() {
-  const [page, setPage] = useState('chemistry')
+  const [currentModule, setCurrentModule] = useState('chemical_reactions');
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-indigo-100">
-      <nav className="bg-white shadow-md py-4">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              <span className="font-bold text-xl text-blue-600">Chemistry Learning</span>
-            </div>
-            <div className="flex space-x-4">
-              <button 
-                onClick={() => setPage('chemistry')}
-                className={`px-3 py-2 rounded-md text-sm font-medium ${page === 'chemistry' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}
-              >
-                Nomenclature Quiz
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-      
-      <main className="py-10">
-        {page === 'chemistry' && <ChemistryQuiz />}
-      </main>
-      
-      <footer className="bg-white py-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-4">
-          <p className="text-center text-gray-500 text-sm">
-            © {new Date().getFullYear()} Chemistry Learning App
-          </p>
-        </div>
-      </footer>
-    </div>
-  )
+    <Router basename="/for-ro">
+      <div className="min-h-screen bg-gray-50">
+        <ModuleSelector 
+          modules={modules} 
+          currentModule={currentModule} 
+          onModuleChange={setCurrentModule} 
+        />
+        
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/module/:moduleId" element={<ModuleOverview modules={modules} />} />
+          <Route path="/module/:moduleId/:topicId" element={<TopicPage modules={modules} />} />
+        </Routes>
+      </div>
+    </Router>
+  );
 }
 
-export default App
+export default App;

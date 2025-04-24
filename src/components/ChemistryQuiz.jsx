@@ -1,5 +1,73 @@
 import { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
+
+// Helper component to display text with subscripts
+const FormulaDisplay = ({ formula }) => {
+  // Split the formula into segments with subscripts
+  if (!formula) return null;
+  
+  const segments = [];
+  let currentText = '';
+  let currentNum = '';
+  let inSubscript = false;
+  
+  // Parse the formula
+  for (let i = 0; i < formula.length; i++) {
+    const char = formula[i];
+    // Check if we're dealing with a number that should be subscript
+    if (/[0-9]/.test(char)) {
+      if (currentText) {
+        segments.push({ text: currentText, isSubscript: false });
+        currentText = '';
+      }
+      currentNum += char;
+      inSubscript = true;
+    } else {
+      if (inSubscript && currentNum) {
+        segments.push({ text: currentNum, isSubscript: true });
+        currentNum = '';
+        inSubscript = false;
+      }
+      currentText += char;
+    }
+  }
+  
+  // Add any remaining text
+  if (currentText) {
+    segments.push({ text: currentText, isSubscript: false });
+  }
+  
+  // Add any remaining number
+  if (currentNum) {
+    segments.push({ text: currentNum, isSubscript: true });
+  }
+  
+  return (
+    <span className="inline-flex items-baseline">
+      {segments.map((segment, index) => (
+        segment.isSubscript ? (
+          <sub key={index} className="relative text-xs bottom-[-0.25em]">{segment.text}</sub>
+        ) : (
+          <span key={index}>{segment.text}</span>
+        )
+      ))}
+    </span>
+  );
+};
+
+// Helper function to normalize formula input
+const normalizeFormula = (input) => {
+  // Convert unicode subscripts to regular numbers for comparison
+  const subscriptMap = {
+    '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', 
+    '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9'
+  };
+  
+  return input.replace(/[₀-₉]/g, m => subscriptMap[m])
+              .toLowerCase()
+              .replace(/\s+/g, '');
+};
 
 // Mock data for chemistry questions based on the test image
 const chemistryQuestions = {
@@ -42,25 +110,70 @@ const ChemistryQuiz = () => {
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [showingAnswers, setShowingAnswers] = useState(false);
+  // We use answersMap to keep track of the mapping between keys and question IDs
+  // but we don't actively reference it, so we can suppress the linter warning
+  // eslint-disable-next-line no-unused-vars
+  const [answersMap, setAnswersMap] = useState({});
 
   // Generate random questions on component mount
   useEffect(() => {
-    setFormulaQuestions(getRandomQuestions(chemistryQuestions.writeFormula, 6));
-    setNameQuestions(getRandomQuestions(chemistryQuestions.nameCompound, 6));
-    // Initialize empty answers object
+    const newFormulaQuestions = getRandomQuestions(chemistryQuestions.writeFormula, 6);
+    const newNameQuestions = getRandomQuestions(chemistryQuestions.nameCompound, 6);
+    
+    setFormulaQuestions(newFormulaQuestions);
+    setNameQuestions(newNameQuestions);
+    
+    // Initialize empty answers object with unique keys for each question
     const initialAnswers = {};
-    [...getRandomQuestions(chemistryQuestions.writeFormula, 6), 
-     ...getRandomQuestions(chemistryQuestions.nameCompound, 6)].forEach(q => {
-      initialAnswers[q.id] = '';
+    const initialAnswersMap = {};
+    
+    newFormulaQuestions.forEach((q, index) => {
+      const key = `formula_${q.id}_${index}`;
+      initialAnswers[key] = '';
+      initialAnswersMap[key] = q.id;
     });
+    
+    newNameQuestions.forEach((q, index) => {
+      const key = `name_${q.id}_${index}`;
+      initialAnswers[key] = '';
+      initialAnswersMap[key] = q.id;
+    });
+    
     setAnswers(initialAnswers);
+    setAnswersMap(initialAnswersMap);
   }, []);
 
-  const handleInputChange = (id, value) => {
+  const handleInputChange = (key, value) => {
     setAnswers({
       ...answers,
-      [id]: value
+      [key]: value
     });
+  };
+
+  const handleSubscriptKey = (e, key) => {
+    // Convert numbers to subscripts when user presses Ctrl+number
+    if (e.ctrlKey && e.key >= '0' && e.key <= '9') {
+      e.preventDefault();
+      const subscriptMap = {
+        '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+        '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
+      };
+      
+      const cursorPos = e.target.selectionStart;
+      const value = answers[key] || '';
+      const newValue = 
+        value.substring(0, cursorPos) + 
+        subscriptMap[e.key] + 
+        value.substring(cursorPos);
+      
+      handleInputChange(key, newValue);
+      
+      // Set cursor position after the inserted character
+      setTimeout(() => {
+        e.target.selectionStart = cursorPos + 1;
+        e.target.selectionEnd = cursorPos + 1;
+      }, 0);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -70,14 +183,24 @@ const ChemistryQuiz = () => {
     // Calculate score
     let correctCount = 0;
     
-    formulaQuestions.forEach(q => {
-      if (answers[q.id]?.toLowerCase().replace(/\s+/g, '') === q.formula.toLowerCase().replace(/\s+/g, '')) {
+    // Check formula answers
+    formulaQuestions.forEach((q, index) => {
+      const key = `formula_${q.id}_${index}`;
+      const userAnswer = answers[key] || '';
+      const correctAnswer = q.formula;
+      
+      if (normalizeFormula(userAnswer) === normalizeFormula(correctAnswer)) {
         correctCount++;
       }
     });
     
-    nameQuestions.forEach(q => {
-      if (answers[q.id]?.toLowerCase().replace(/\s+/g, '') === q.name.toLowerCase().replace(/\s+/g, '')) {
+    // Check name answers
+    nameQuestions.forEach((q, index) => {
+      const key = `name_${q.id}_${index}`;
+      const userAnswer = answers[key] || '';
+      const correctAnswer = q.name;
+      
+      if (userAnswer.toLowerCase().replace(/\s+/g, '') === correctAnswer.toLowerCase().replace(/\s+/g, '')) {
         correctCount++;
       }
     });
@@ -87,16 +210,30 @@ const ChemistryQuiz = () => {
 
   const resetQuiz = () => {
     // Generate new questions
-    setFormulaQuestions(getRandomQuestions(chemistryQuestions.writeFormula, 6));
-    setNameQuestions(getRandomQuestions(chemistryQuestions.nameCompound, 6));
+    const newFormulaQuestions = getRandomQuestions(chemistryQuestions.writeFormula, 6);
+    const newNameQuestions = getRandomQuestions(chemistryQuestions.nameCompound, 6);
     
-    // Reset answers
+    setFormulaQuestions(newFormulaQuestions);
+    setNameQuestions(newNameQuestions);
+    
+    // Reset answers with unique keys
     const initialAnswers = {};
-    [...getRandomQuestions(chemistryQuestions.writeFormula, 6), 
-     ...getRandomQuestions(chemistryQuestions.nameCompound, 6)].forEach(q => {
-      initialAnswers[q.id] = '';
+    const initialAnswersMap = {};
+    
+    newFormulaQuestions.forEach((q, index) => {
+      const key = `formula_${q.id}_${index}`;
+      initialAnswers[key] = '';
+      initialAnswersMap[key] = q.id;
     });
+    
+    newNameQuestions.forEach((q, index) => {
+      const key = `name_${q.id}_${index}`;
+      initialAnswers[key] = '';
+      initialAnswersMap[key] = q.id;
+    });
+    
     setAnswers(initialAnswers);
+    setAnswersMap(initialAnswersMap);
     
     // Reset state
     setSubmitted(false);
@@ -130,6 +267,11 @@ const ChemistryQuiz = () => {
       >
         <h1 className="text-3xl font-bold text-blue-700 mb-2">Chemistry Nomenclature Quiz</h1>
         <p className="text-lg text-gray-600">Test your knowledge of chemical formulas and naming</p>
+        {!submitted && (
+          <div className="mt-3 text-sm bg-blue-50 p-3 rounded-md text-blue-800">
+            <p>Pro tip: Use Ctrl+Number to enter subscripts (e.g., Ctrl+2 for ₂)</p>
+          </div>
+        )}
       </motion.div>
 
       <form onSubmit={handleSubmit}>
@@ -142,45 +284,52 @@ const ChemistryQuiz = () => {
           <h2 className="text-xl font-semibold text-blue-600 mb-4 border-b pb-2">1. Write the formula for each compound:</h2>
           
           <div className="grid md:grid-cols-2 gap-6">
-            {formulaQuestions.map((question, index) => (
-              <motion.div 
-                key={question.id}
-                variants={itemVariants}
-                className="relative"
-              >
-                <div className="flex items-center mb-2">
-                  <span className="text-lg font-medium text-gray-700 mr-2">{String.fromCharCode(97 + index)})</span>
-                  <motion.span 
-                    className="transition-all duration-300 ease-in-out transform"
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    {question.name}
-                  </motion.span>
-                </div>
-                
-                <input
-                  type="text"
-                  value={answers[question.id] || ''}
-                  onChange={(e) => handleInputChange(question.id, e.target.value)}
-                  disabled={submitted}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-                  placeholder="Enter formula..."
-                />
-                
-                {submitted && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className={`mt-1 text-sm ${answers[question.id]?.toLowerCase().replace(/\s+/g, '') === question.formula.toLowerCase().replace(/\s+/g, '') ? 'text-green-600' : 'text-red-600'}`}
-                  >
-                    {answers[question.id]?.toLowerCase().replace(/\s+/g, '') === question.formula.toLowerCase().replace(/\s+/g, '') 
-                      ? '✓ Correct!' 
-                      : `✗ Incorrect. ${showingAnswers ? `Correct answer: ${question.formula}` : ''}`}
-                  </motion.div>
-                )}
-              </motion.div>
-            ))}
+            {formulaQuestions.map((question, index) => {
+              const key = `formula_${question.id}_${index}`;
+              return (
+                <motion.div 
+                  key={key}
+                  variants={itemVariants}
+                  className="relative"
+                >
+                  <div className="flex items-center mb-2">
+                    <span className="text-lg font-medium text-gray-700 mr-2">{String.fromCharCode(97 + index)})</span>
+                    <motion.span 
+                      className="transition-all duration-300 ease-in-out transform"
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      {question.name}
+                    </motion.span>
+                  </div>
+                  
+                  <input
+                    type="text"
+                    value={answers[key] || ''}
+                    onChange={(e) => handleInputChange(key, e.target.value)}
+                    onKeyDown={(e) => handleSubscriptKey(e, key)}
+                    disabled={submitted}
+                    className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500 font-mono"
+                    placeholder="Enter formula (Ctrl+number for subscripts)..."
+                  />
+                  
+                  {submitted && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className={`mt-1 text-sm ${normalizeFormula(answers[key] || '') === normalizeFormula(question.formula) ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {normalizeFormula(answers[key] || '') === normalizeFormula(question.formula) 
+                        ? '✓ Correct!' 
+                        : `✗ Incorrect. ${showingAnswers ? 'Correct answer: ' : ''}`}
+                      {showingAnswers && !normalizeFormula(answers[key] || '') === normalizeFormula(question.formula) && (
+                        <FormulaDisplay formula={question.formula} />
+                      )}
+                    </motion.div>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
 
@@ -193,45 +342,48 @@ const ChemistryQuiz = () => {
           <h2 className="text-xl font-semibold text-blue-600 mb-4 border-b pb-2">2. Write the name for each formula:</h2>
           
           <div className="grid md:grid-cols-2 gap-6">
-            {nameQuestions.map((question, index) => (
-              <motion.div 
-                key={question.id}
-                variants={itemVariants}
-                className="relative"
-              >
-                <div className="flex items-center mb-2">
-                  <span className="text-lg font-medium text-gray-700 mr-2">{String.fromCharCode(97 + index)})</span>
-                  <motion.span 
-                    className="transition-all duration-300 ease-in-out transform font-mono"
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    {question.formula}
-                  </motion.span>
-                </div>
-                
-                <input
-                  type="text"
-                  value={answers[question.id] || ''}
-                  onChange={(e) => handleInputChange(question.id, e.target.value)}
-                  disabled={submitted}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-                  placeholder="Enter name..."
-                />
-                
-                {submitted && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className={`mt-1 text-sm ${answers[question.id]?.toLowerCase().replace(/\s+/g, '') === question.name.toLowerCase().replace(/\s+/g, '') ? 'text-green-600' : 'text-red-600'}`}
-                  >
-                    {answers[question.id]?.toLowerCase().replace(/\s+/g, '') === question.name.toLowerCase().replace(/\s+/g, '') 
-                      ? '✓ Correct!' 
-                      : `✗ Incorrect. ${showingAnswers ? `Correct answer: ${question.name}` : ''}`}
-                  </motion.div>
-                )}
-              </motion.div>
-            ))}
+            {nameQuestions.map((question, index) => {
+              const key = `name_${question.id}_${index}`;
+              return (
+                <motion.div 
+                  key={key}
+                  variants={itemVariants}
+                  className="relative"
+                >
+                  <div className="flex items-center mb-2">
+                    <span className="text-lg font-medium text-gray-700 mr-2">{String.fromCharCode(97 + index)})</span>
+                    <motion.span 
+                      className="transition-all duration-300 ease-in-out transform font-mono"
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      <FormulaDisplay formula={question.formula} />
+                    </motion.span>
+                  </div>
+                  
+                  <input
+                    type="text"
+                    value={answers[key] || ''}
+                    onChange={(e) => handleInputChange(key, e.target.value)}
+                    disabled={submitted}
+                    className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
+                    placeholder="Enter name..."
+                  />
+                  
+                  {submitted && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className={`mt-1 text-sm ${(answers[key] || '').toLowerCase().replace(/\s+/g, '') === question.name.toLowerCase().replace(/\s+/g, '') ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {(answers[key] || '').toLowerCase().replace(/\s+/g, '') === question.name.toLowerCase().replace(/\s+/g, '') 
+                        ? '✓ Correct!' 
+                        : `✗ Incorrect. ${showingAnswers ? `Correct answer: ${question.name}` : ''}`}
+                    </motion.div>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
 
