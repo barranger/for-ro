@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import ChemicalProperties from '../components/ChemicalProperties';
+import MacbethQuiz from '../components/MacbethQuiz';
 
 const TopicPage = ({ modules }) => {
   const { moduleId, topicId } = useParams();
@@ -19,6 +20,10 @@ const TopicPage = ({ modules }) => {
   // Render the appropriate component based on the topic
   if (topic === "Chemicals and their Properties") {
     return <ChemicalProperties />;
+  }
+
+  if (topic === "Macbeth Act 1") {
+    return <MacbethQuiz />;
   }
 
   return (

@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 
 const ModuleSelector = ({ modules, currentModule, onModuleChange }) => {
   const location = useLocation();
@@ -10,12 +9,9 @@ const ModuleSelector = ({ modules, currentModule, onModuleChange }) => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center">
           <Link to="/" className="flex items-center space-x-2">
-            <motion.span 
-              whileHover={{ scale: 1.05 }}
-              className="font-bold text-xl text-blue-600"
-            >
-              Science Learning
-            </motion.span>
+            <span className="font-bold text-xl text-blue-600">
+              My Learning
+            </span>
           </Link>
           
           {!isHome && (

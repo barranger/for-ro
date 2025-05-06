@@ -8,26 +8,8 @@ import ModuleSelector from './components/ModuleSelector';
 import './App.css';
 import modules from './config/modules';
 
-// Define our available modules
-const MODULES = {
-  chemistry: {
-    name: 'Chemistry',
-    description: 'Learn about atoms, molecules, and chemical reactions',
-    topics: [
-      {
-        id: 'nomenclature',
-        name: 'Chemical Nomenclature',
-        description: 'Learn how to name chemical compounds and write chemical formulas',
-        component: ChemistryQuiz
-      },
-      // More topics will be added here
-    ]
-  },
-  // More modules will be added here
-};
-
 function App() {
-  const [currentModule, setCurrentModule] = useState('chemical_reactions');
+  const [currentModule, setCurrentModule] = useState('science');
 
   return (
     <Router basename="/for-ro">
